@@ -2,6 +2,7 @@
 
 import os
 import sys
+import time
 import argparse
 import requests
 import json
@@ -125,17 +126,23 @@ def get_job_status(job_id):
     log("Getting status...")
 
     status_params = {'job': job_id}
-    r = requests.get(STATUS_URL, params=status_params)
+    while True:
+        r = requests.get(STATUS_URL, params=status_params)
 
-    debug("job status responce code : {}".format(r.status_code))
-    debug("job status responce text : {}".format(r.text))
+        debug("job status responce code : {}".format(r.status_code))
+        debug("job status responce text : {}".format(r.text))
 
-    json_result = json.loads(r.text)
-    if json_result["message"] == "Ok":
-        log("Your app can be downloaded at : {}".format(json_result["link"]))
-    else:
-        log("Your app failed to post")
-        sys.exit(1)
+        if r.status_code == 200:
+            json_result = json.loads(r.text)
+            if json_result["status"] == 2000:
+                log("Your app can be downloaded at : {}".format(json_result["link"]))
+                break
+            else:
+                debug("App is not ready, waiting before retry")
+                time.sleep(6)
+        else:
+            log("Server encounted an error")
+            sys.exit(1)
 
 
 def main(args):
