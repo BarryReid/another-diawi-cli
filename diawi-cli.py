@@ -4,7 +4,7 @@ import os
 import sys
 import time
 import argparse
-import requests
+import requests           # pip install requests
 import json
 import string
 import random
