@@ -15,26 +15,43 @@ UPLOAD_URL = 'https://upload.diawi.com/plupload.php'
 POST_URL = 'https://upload.diawi.com/plupload'
 STATUS_URL = 'https://upload.diawi.com/status'
 
+set_debug = False
+
+
+def debug(message):
+    if set_debug is True:
+        print("debug : {}".format(message))
+
+
+def log(message):
+    print("log : {}".format(message))
+
 
 def validate_file(args):
     if not os.path.isfile(args.file):
-        print("File does not exist!")
+        log("File does not exist!")
         sys.exit(1)
+    debug("found file {}".format(args.file))
 
     name, extention = os.path.splitext(args.file)
 
     if extention == ".ipa" or extention == ".zip" or extention == ".apk":
+        debug("valid file extention : {}".format(extention))
         return True
     else:
-        print("File type not accepted!")
+        log("File type not accepted!")
         sys.exit(1)
 
 
 def create_tmp_file_name(args):
     name, extention = os.path.splitext(args.file)
 
-    return "o_{}{}".format(''.join(random.SystemRandom().choice(
+    tmp_file_name = "o_{}{}".format(''.join(random.SystemRandom().choice(
         string.ascii_lowercase + string.digits) for _ in range(29)), extention)
+
+    debug("temp file name : {}".format(tmp_file_name))
+
+    return tmp_file_name
 
 
 def get_token():
@@ -45,13 +62,13 @@ def get_token():
         token = soup.find("input", type="hidden")["value"]
 
         if token is None:
-            print("Could not get token!")
+            log("Could not get token!")
             sys.exit(1)
         else:
-            print("found token : {}".format(token))
+            log("found token : {}".format(token))
             return token
     else:
-        print("{} not available!".format(TOKEN_URL))
+        log("{} not available!".format(TOKEN_URL))
 
 
 def file_upload(args, tmp_file_name, token):
@@ -59,14 +76,17 @@ def file_upload(args, tmp_file_name, token):
     upload_data = {'name': tmp_file_name}
     upload_params = {'token': token}
 
-    print("Uploading File...")
+    log("Uploading File...")
     r = requests.post(UPLOAD_URL, params=upload_params, files=files, data=upload_data)
 
+    debug("file upload responce code : {}".format(r.status_code))
+    debug("file upload responce text : {}".format(r.text))
+
     if r.status_code != 200:
-        print("Failed to upload file!")
+        log("Failed to upload file!")
         sys.exit(1)
 
-    print("Upload complete!")
+    log("Upload complete!")
 
 
 def file_post(args, tmp_file_name, token):
@@ -86,33 +106,44 @@ def file_post(args, tmp_file_name, token):
         'wall': 'on' if args.wall else 'off'
     }
 
-    print("Posting File...")
+    log("Posting File...")
     r = requests.post(POST_URL, data=post_data)
 
+    debug("file post responce code : {}".format(r.status_code))
+    debug("file post responce text : {}".format(r.text))
+
     if r.status_code != 200:
-        print("Failed to post file!")
+        log("Failed to post file!")
         sys.exit(1)
 
     json_result = json.loads(r.text)
-    print(json_result["job"])
+    log(json_result["job"])
     return json_result["job"]
 
 
 def get_job_status(job_id):
-    print("Getting status...")
+    log("Getting status...")
 
     status_params = {'job': job_id}
     r = requests.get(STATUS_URL, params=status_params)
 
+    debug("job status responce code : {}".format(r.status_code))
+    debug("job status responce text : {}".format(r.text))
+
     json_result = json.loads(r.text)
     if json_result["message"] == "Ok":
-        print("Your app can be downloaded at : {}".format(json_result["link"]))
+        log("Your app can be downloaded at : {}".format(json_result["link"]))
     else:
-        print("Your app failed to post")
+        log("Your app failed to post")
         sys.exit(1)
 
 
 def main(args):
+    global set_debug
+
+    if args.debug is True:
+        set_debug = True
+
     validate_file(args)
     tmp_file_name = create_tmp_file_name(args)
     token = get_token()
@@ -120,7 +151,8 @@ def main(args):
     job_id = file_post(args, tmp_file_name, token)
     get_job_status(job_id)
 
-    print("Finished!")
+    log("Finished!")
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -131,6 +163,7 @@ if __name__ == '__main__':
     parser.add_argument("-n", "--notif",    help="Notify when user installs application", action="store_true")
     parser.add_argument("-u", "--udid",     help="Allow testers to find by UDID on Daiwi", action="store_true")
     parser.add_argument("-w", "--wall",     help="List icon on Diawi 'Wall of Apps'", action="store_true")
+    parser.add_argument("-d", "--debug",    help="Set to enable debug", action="store_true")
     args = parser.parse_args()
 
     main(args)
