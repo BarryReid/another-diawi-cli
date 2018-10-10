@@ -8,6 +8,7 @@ import requests           # pip install requests
 import json
 import string
 import random
+import re
 
 from bs4 import BeautifulSoup
 
@@ -60,7 +61,10 @@ def get_token():
 
     if r.status_code == 200:
         soup = BeautifulSoup(r.text, 'html.parser')
-        token = soup.find("input", type="hidden")["value"]
+        #token = soup.find("input", type="hidden")["value"]
+        atext = soup.find("script", id="home-js").get_text()
+        aline = [line for line in atext.split('\n') if "DIAWI_UPLOAD_TOKEN" in line]
+        token = re.findall(r"'(.*?)'", aline[0])
 
         if token is None:
             log("Could not get token!")
@@ -79,6 +83,7 @@ def file_upload(args, tmp_file_name, token):
 
     log("Uploading File...")
     r = requests.post(UPLOAD_URL, params=upload_params, files=files, data=upload_data)
+
 
     debug("file upload responce code : {}".format(r.status_code))
     debug("file upload responce text : {}".format(r.text))
@@ -99,12 +104,12 @@ def file_post(args, tmp_file_name, token):
         'uploader_0_name': file_name,
         'uploader_0_status': 'done',
         'uploader_count': '1',
-        'comment': args.comment if args.comment else '',
-        'email': args.email if args.email else '',
-        'password': args.password if args.password else '',
-        'notifs': 'on' if args.notif else 'off',
-        'udid': 'on' if args.udid else 'off',
-        'wall': 'on' if args.wall else 'off'
+        'comment': '',
+        'email': '',
+        'password': '',
+        'notifs': 'off',
+        'udid': 'off',
+        'wall': 'off'
     }
 
     log("Posting File...")
@@ -122,10 +127,10 @@ def file_post(args, tmp_file_name, token):
     return json_result["job"]
 
 
-def get_job_status(job_id):
+def get_job_status(token_id, job_id):
     log("Getting status...")
 
-    status_params = {'job': job_id}
+    status_params = {'token': token_id, 'job': job_id}
     while True:
         r = requests.get(STATUS_URL, params=status_params)
 
@@ -156,7 +161,7 @@ def main(args):
     token = get_token()
     file_upload(args, tmp_file_name, token)
     job_id = file_post(args, tmp_file_name, token)
-    get_job_status(job_id)
+    get_job_status(token, job_id)
 
     log("Finished!")
 
